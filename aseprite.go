@@ -14,6 +14,7 @@ import (
 )
 
 type element struct {
+	Index int
 	Group string
 	Name  string
 	X     int16
@@ -34,7 +35,10 @@ type asepriteImporter struct {
 }
 
 func (a asepriteImporter) Import(filenames []string) error {
-	var animations []animation
+	var (
+		animations []animation
+		datas      []string
+	)
 	for _, file := range filenames {
 		var aseFile asefile.AsepriteFile
 		if err := aseFile.DecodeFile(file); err != nil {
@@ -47,19 +51,27 @@ func (a asepriteImporter) Import(filenames []string) error {
 			if err := a.importUI(name, aseFile); err != nil {
 				return err
 			}
-		} else if strings.HasSuffix(dir, "objects/") {
-			anim, err := a.importGameObject(name, aseFile)
+		} else if strings.HasSuffix(dir, "sprites/") {
+			anim, err := a.importSprite(name, aseFile)
 			if err != nil {
 				return err
 			}
 			animations = append(animations, anim...)
 		} else if strings.HasSuffix(dir, "levels/") {
-			if err := a.importLevel(name, aseFile); err != nil {
+			data, err := a.importLevel(name, len(datas), aseFile)
+			if err != nil {
 				return err
 			}
+			datas = append(datas, data...)
 		} else {
 			log.Printf("no support for importing %s yet", file)
 		}
+	}
+	if err := a.render("data.lua", dataTemplate, datas); err != nil {
+		return err
+	}
+	if err := a.writeFile("data.script", bytes.NewBufferString(`go.property("data", 1)`)); err != nil {
+		return err
 	}
 	// Combine all game animations into single atlas for performance
 	if err := a.render("all.atlas", animationsTemplate, animations); err != nil {
@@ -68,7 +80,7 @@ func (a asepriteImporter) Import(filenames []string) error {
 	return nil
 }
 
-func (a asepriteImporter) importGameObject(filename string, file asefile.AsepriteFile) ([]animation, error) {
+func (a asepriteImporter) importSprite(filename string, file asefile.AsepriteFile) ([]animation, error) {
 	var anims []animation
 	for i, frame := range file.Frames {
 		if err := a.writePNG(fmt.Sprintf("img/%s_%d.png", filename, i), frame.Cels...); err != nil {
@@ -100,11 +112,69 @@ func (a asepriteImporter) importGameObject(filename string, file asefile.Aseprit
 			anims = append(anims, anim)
 		}
 	}
+	if err := a.render(filename+".sprite", spriteTemplate, filename); err != nil {
+		return anims, err
+	}
 	return anims, nil
 }
 
-func (a asepriteImporter) importLevel(filename string, file asefile.AsepriteFile) error {
-	return nil
+func (a asepriteImporter) importLevel(filename string, dataOffset int, file asefile.AsepriteFile) ([]string, error) {
+	var (
+		objects  []element
+		triggers []element
+	)
+	for _, frame := range file.Frames {
+		for _, cel := range frame.Cels {
+			layer := frame.Layers[cel.LayerIndex].LayerName
+			if err := a.writePNG(fmt.Sprintf("img/%s_%s.png", filename, layer), cel); err != nil {
+				return nil, err
+			}
+			centerX := cel.X + int16(cel.WidthInPix)/2
+			centerY := cel.Y + int16(cel.HeightInPix)/2
+			objects = append(objects, element{
+				Group: filename,
+				Name:  layer,
+				X:     centerX,
+				// y coordinates are reversed in defold
+				Y: int16(file.Header.HeightInPixels) - centerY,
+				W: int(cel.WidthInPix),
+				H: int(cel.HeightInPix),
+			})
+		}
+		for _, slice := range frame.Slices {
+			for _, data := range slice.SliceKeysData {
+				centerX := int16(data.SliceXOriginCoords) + int16(data.SliceWidth)/2
+				centerY := int16(data.SliceYOriginCoords) + int16(data.SliceHeight)/2
+				triggers = append(triggers, element{
+					Index: dataOffset + 1,
+					Group: filename,
+					Name:  slice.Name,
+					X:     centerX,
+					// y coordinates are reversed in defold
+					Y: int16(file.Header.HeightInPixels) - centerY,
+					// For some reason box2d shapes end up twice the width you specify
+					W: int(data.SliceWidth / 2),
+					H: int(data.SliceHeight / 2),
+				})
+			}
+		}
+	}
+	var level struct {
+		Filename string
+		Objects  []element
+		Triggers []element
+	}
+	level.Filename = filename
+	level.Objects = objects
+	level.Triggers = triggers
+	if err := a.render(filename+".atlas", atlasTemplate, level.Objects); err != nil {
+		return nil, err
+	}
+	var data []string
+	for _, trigger := range triggers {
+		data = append(data, fmt.Sprintf(`{ name = %q }`, trigger.Name))
+	}
+	return data, a.render(filename+".collection", collectionTemplate, level)
 }
 
 func (a asepriteImporter) importUI(filename string, file asefile.AsepriteFile) error {
@@ -132,6 +202,9 @@ func (a asepriteImporter) importUI(filename string, file asefile.AsepriteFile) e
 	return a.render(filename+".gui", guiTemplate, gui)
 }
 
+// TODO: this function seems like it would support multiple cels and flatten the layers,
+// however they currently all would have to be the same x, y, width and height,
+// which is kinda useless. Will improve later
 func (a asepriteImporter) writePNG(filename string, cels ...asefile.AsepriteCelChunk2005) error {
 	w, h := 1, 1
 	if len(cels) > 0 {

@@ -2,6 +2,13 @@ package main
 
 import "text/template"
 
+var spriteTemplate = template.Must(template.New("").Parse(`
+tile_set: "/import/all.atlas"
+default_animation: "{{ . }}_idle"
+material: "/builtins/materials/sprite.material"
+blend_mode: BLEND_MODE_ALPHA
+`))
+
 var atlasTemplate = template.Must(template.New("").Parse(`
 {{- range . }}
 images {
