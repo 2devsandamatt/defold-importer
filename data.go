@@ -7,7 +7,7 @@ var dataTemplate = template.Must(template.New("").Funcs(template.FuncMap{
 }).Parse(`
 local data = {}
 {{- range $i, $v := . }}
-data[{{ inc $i }}] = {{ $v }}
+data[{{ inc $i }}] = {{ printf "%q" $v }}
 {{- end }}
 data.attached = function (id)
 	local script = msg.url(nil, id, "data")

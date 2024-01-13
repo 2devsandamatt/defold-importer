@@ -3,10 +3,10 @@ package main
 import "text/template"
 
 var guiTemplate = template.Must(template.New("").Parse(`
-script: ""
+script: "{{ .Script }}"
 textures {
   name: "ui"
-  texture: "/import/{{ with index . 0 }}{{ .Group }}{{ end }}.atlas"
+  texture: "/import/{{ with index .Elements 0 }}{{ .Group }}{{ end }}.atlas"
 }
 background_color {
   x: 0.0
@@ -14,7 +14,7 @@ background_color {
   z: 0.0
   w: 0.0
 }
-{{ range . }}
+{{ range .Elements }}
 nodes {
   position {
     x: {{ .X }}.0

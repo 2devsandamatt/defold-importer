@@ -7,7 +7,9 @@ import (
 	"image/color"
 	"image/png"
 	"log"
+	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/Racinettee/asefile"
@@ -122,6 +124,7 @@ func (a asepriteImporter) importLevel(filename string, dataOffset int, file asef
 	var (
 		objects  []element
 		triggers []element
+		datas    []string
 	)
 	for _, frame := range file.Frames {
 		for _, cel := range frame.Cels {
@@ -156,6 +159,7 @@ func (a asepriteImporter) importLevel(filename string, dataOffset int, file asef
 					W: int(data.SliceWidth / 2),
 					H: int(data.SliceHeight / 2),
 				})
+				datas = append(datas, slice.Name)
 			}
 		}
 	}
@@ -170,22 +174,23 @@ func (a asepriteImporter) importLevel(filename string, dataOffset int, file asef
 	if err := a.render(filename+".atlas", atlasTemplate, level.Objects); err != nil {
 		return nil, err
 	}
-	var data []string
-	for _, trigger := range triggers {
-		data = append(data, fmt.Sprintf(`{ name = %q }`, trigger.Name))
-	}
-	return data, a.render(filename+".collection", collectionTemplate, level)
+	return datas, a.render(filename+".collection", collectionTemplate, level)
 }
 
+var scriptRef = regexp.MustCompile(`script: "(\S+)"`)
+
 func (a asepriteImporter) importUI(filename string, file asefile.AsepriteFile) error {
-	var gui []element
+	var gui struct {
+		Elements []element
+		Script   string
+	}
 	for _, frame := range file.Frames {
 		for _, cel := range frame.Cels {
 			layer := frame.Layers[cel.LayerIndex].LayerName
 			if err := a.writePNG(fmt.Sprintf("img/%s_%s.png", filename, layer), cel); err != nil {
 				return err
 			}
-			gui = append(gui, element{
+			gui.Elements = append(gui.Elements, element{
 				Group: filename,
 				Name:  layer,
 				X:     cel.X,
@@ -196,8 +201,16 @@ func (a asepriteImporter) importUI(filename string, file asefile.AsepriteFile) e
 			})
 		}
 	}
-	if err := a.render(filename+".atlas", atlasTemplate, gui); err != nil {
+	if err := a.render(filename+".atlas", atlasTemplate, gui.Elements); err != nil {
 		return err
+	}
+	// A hack to check if a script has already been attached in the generated gui, so we can keep it attached
+	existing, err := os.ReadFile(filepath.Join(a.outputDir, filename+".gui"))
+	if err == nil {
+		matches := scriptRef.FindStringSubmatch(string(existing))
+		if matches != nil {
+			gui.Script = matches[1]
+		}
 	}
 	return a.render(filename+".gui", guiTemplate, gui)
 }
