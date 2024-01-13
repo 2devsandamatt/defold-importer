@@ -1,4 +1,4 @@
-module asepriteparse
+module defoldgameframework
 
 go 1.21.5
 

@@ -46,7 +46,7 @@ func (i importer) Import() error {
 
 func main() {
 	var output string
-	flag.StringVar(&output, "output", "testdata", "Folder to output to")
+	flag.StringVar(&output, "output", "import", "Folder to output to")
 	flag.Parse()
 	importer := importer{root: flag.Arg(0)}
 	importer.aseprite = asepriteImporter{output}
