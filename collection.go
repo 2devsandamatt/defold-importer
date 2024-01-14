@@ -75,7 +75,7 @@ embedded_instances {
 {{- end }}
 {{- range .Triggers }}
 embedded_instances {
-  id: "end"
+  id: "{{ .Name }}"
   data: "components {\n"
   "  id: \"data\"\n"
   "  component: \"/import/data.script\"\n"

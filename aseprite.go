@@ -159,6 +159,7 @@ func (a asepriteImporter) importLevel(filename string, dataOffset int, file asef
 					W: int(data.SliceWidth / 2),
 					H: int(data.SliceHeight / 2),
 				})
+				dataOffset++
 				datas = append(datas, slice.Name)
 			}
 		}
