@@ -4,6 +4,7 @@ import (
 	"flag"
 	"io/fs"
 	"log"
+	"os"
 	"path/filepath"
 )
 
@@ -35,6 +36,7 @@ func (i importer) Import() error {
 	}); err != nil {
 		return err
 	}
+	os.MkdirAll(filepath.Join(i.root, "img"), os.ModeDir)
 	if err := i.aseprite.Import(asepriteFiles); err != nil {
 		return err
 	}
