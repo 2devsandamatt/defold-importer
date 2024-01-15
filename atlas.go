@@ -11,10 +11,12 @@ blend_mode: BLEND_MODE_ALPHA
 
 var atlasTemplate = template.Must(template.New("").Parse(`
 {{- range . }}
+{{- if .Group }}
 images {
 image: "/import/img/{{ .Group }}_{{ .Name }}.png"
 sprite_trim_mode: SPRITE_TRIM_MODE_OFF
 }
+{{- end }}
 {{ end -}}
 margin: 2
 extrude_borders: 0

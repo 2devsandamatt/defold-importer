@@ -185,9 +185,12 @@ var scriptRef = regexp.MustCompile(`script: "(\S+)"`)
 
 func (a asepriteImporter) importUI(filename string, file asefile.AsepriteFile) error {
 	var gui struct {
+		Textures []string
 		Elements []element
 		Script   string
 	}
+	gui.Textures = append(gui.Textures, "ui")
+	needsAllTextures := false
 	for _, frame := range file.Frames {
 		for _, cel := range frame.Cels {
 			layer := frame.Layers[cel.LayerIndex].LayerName
@@ -204,6 +207,25 @@ func (a asepriteImporter) importUI(filename string, file asefile.AsepriteFile) e
 				H: int(cel.HeightInPix),
 			})
 		}
+		if len(frame.Slices) > 0 {
+			needsAllTextures = true
+
+			for _, slice := range frame.Slices {
+				for _, key := range slice.SliceKeysData {
+					gui.Elements = append(gui.Elements, element{
+						Name: slice.Name,
+						X:    int16(key.SliceXOriginCoords),
+						// y coordinates are reversed in defold
+						Y: int16(file.Header.HeightInPixels) - int16(key.SliceYOriginCoords),
+						W: int(key.SliceWidth),
+						H: int(key.SliceHeight),
+					})
+				}
+			}
+		}
+	}
+	if needsAllTextures {
+		gui.Textures = append(gui.Textures, "all")
 	}
 	if err := a.render(filename+".atlas", atlasTemplate, gui.Elements); err != nil {
 		return err

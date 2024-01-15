@@ -4,10 +4,12 @@ import "text/template"
 
 var guiTemplate = template.Must(template.New("").Parse(`
 script: "{{ .Script }}"
+{{ range .Textures }}
 textures {
-  name: "ui"
-  texture: "/import/{{ with index .Elements 0 }}{{ .Group }}{{ end }}.atlas"
+  name: "{{ . }}"
+  texture: "/import/{{ . }}.atlas"
 }
+{{ end }}
 background_color {
   x: 0.0
   y: 0.0
@@ -48,7 +50,11 @@ nodes {
   }
   type: TYPE_BOX
   blend_mode: BLEND_MODE_ALPHA
+  {{ if .Group }}
   texture: "ui/{{ .Group }}_{{ .Name }}"
+  {{ else }}
+  texture: ""
+  {{ end }}
   id: "{{ .Name }}"
   xanchor: XANCHOR_NONE
   yanchor: YANCHOR_NONE
@@ -67,7 +73,11 @@ nodes {
   clipping_inverted: false
   alpha: 1.0
   template_node_child: false
+  {{ if .Group }}
   size_mode: SIZE_MODE_AUTO
+  {{ else }}
+  size_mode: SIZE_MODE_MANUAL
+  {{ end }}
   custom_type: 0
   enabled: true
   visible: true
