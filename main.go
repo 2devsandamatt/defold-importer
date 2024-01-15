@@ -13,12 +13,14 @@ type importer struct {
 
 	aseprite asepriteImporter
 	ink      inkImporter
+	csv      csvImporter
 }
 
 func (i importer) Import() error {
 	var (
 		asepriteFiles []string
 		inkFiles      []string
+		csvFiles      []string
 	)
 	if err := filepath.WalkDir(i.root, func(path string, d fs.DirEntry, err error) error {
 		if d.IsDir() {
@@ -29,6 +31,8 @@ func (i importer) Import() error {
 			asepriteFiles = append(asepriteFiles, path)
 		case ".ink":
 			inkFiles = append(inkFiles, path)
+		case ".csv":
+			csvFiles = append(csvFiles, path)
 		default:
 			log.Printf("WARNING: skipping unsupported asset %s", path)
 		}
@@ -43,6 +47,9 @@ func (i importer) Import() error {
 	if err := i.ink.Import(inkFiles); err != nil {
 		return err
 	}
+	if err := i.csv.Import(csvFiles); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -53,6 +60,7 @@ func main() {
 	importer := importer{root: flag.Arg(0)}
 	importer.aseprite = asepriteImporter{output}
 	importer.ink = inkImporter{output}
+	importer.csv = csvImporter{output}
 	if err := importer.Import(); err != nil {
 		log.Fatal(err)
 	}
