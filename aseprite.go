@@ -7,9 +7,7 @@ import (
 	"image/color"
 	"image/png"
 	"log"
-	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 
 	"github.com/Racinettee/asefile"
@@ -181,13 +179,10 @@ func (a asepriteImporter) importLevel(filename string, dataOffset int, file asef
 	return datas, a.render(filename+".collection", collectionTemplate, level)
 }
 
-var scriptRef = regexp.MustCompile(`script: "(\S+)"`)
-
 func (a asepriteImporter) importUI(filename string, file asefile.AsepriteFile) error {
 	var gui struct {
 		Textures []string
 		Elements []element
-		Script   string
 	}
 	gui.Textures = append(gui.Textures, "ui")
 	needsAllTextures := false
@@ -229,14 +224,6 @@ func (a asepriteImporter) importUI(filename string, file asefile.AsepriteFile) e
 	}
 	if err := a.render(filename+".atlas", atlasTemplate, gui.Elements); err != nil {
 		return err
-	}
-	// A hack to check if a script has already been attached in the generated gui, so we can keep it attached
-	existing, err := os.ReadFile(filepath.Join(a.outputDir, filename+".gui"))
-	if err == nil {
-		matches := scriptRef.FindStringSubmatch(string(existing))
-		if matches != nil {
-			gui.Script = matches[1]
-		}
 	}
 	return a.render(filename+".gui", guiTemplate, gui)
 }

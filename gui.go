@@ -3,7 +3,7 @@ package main
 import "text/template"
 
 var guiTemplate = template.Must(template.New("").Parse(`
-script: "{{ .Script }}"
+script: ""
 {{ range .Textures }}
 textures {
   name: "{{ . }}"
