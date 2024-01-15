@@ -46,6 +46,9 @@ func (a asepriteImporter) Import(filenames []string) error {
 		if err := aseFile.DecodeFile(file); err != nil {
 			return fmt.Errorf("failed to decode %s: %s", file, err)
 		}
+		if aseFile.Header.ColorDepth != 32 {
+			return fmt.Errorf("unsupported color depth %d. please convert to RGBA", aseFile.Header.ColorDepth)
+		}
 		// e.g. assets/ui/start.aseprite becomes dir=assets/ui and name=start
 		dir, name := filepath.Split(file)
 		name = strings.TrimSuffix(name, filepath.Ext(name))

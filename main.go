@@ -36,7 +36,7 @@ func (i importer) Import() error {
 	}); err != nil {
 		return err
 	}
-	os.MkdirAll(filepath.Join(i.root, "img"), os.ModeDir)
+	os.MkdirAll(filepath.Join(i.aseprite.outputDir, "img"), os.ModePerm)
 	if err := i.aseprite.Import(asepriteFiles); err != nil {
 		return err
 	}
