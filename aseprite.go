@@ -2,10 +2,13 @@ package main
 
 import (
 	"bytes"
+	"compress/zlib"
+	"encoding/binary"
 	"fmt"
 	"image"
 	"image/color"
 	"image/png"
+	"io"
 	"log"
 	"path/filepath"
 	"strings"
@@ -125,25 +128,81 @@ func (a asepriteImporter) importLevel(filename string, dataOffset int, file asef
 	var (
 		objects  []element
 		triggers []element
+		tiles    []element
 		datas    []string
 	)
 	for _, frame := range file.Frames {
-		for _, cel := range frame.Cels {
-			layer := frame.Layers[cel.LayerIndex].LayerName
-			if err := a.writePNG(fmt.Sprintf("img/%s_%s.png", filename, layer), cel); err != nil {
+		tilesets := make(map[uint32]asefile.AsepriteTilesetChunk2023)
+		for _, tileset := range frame.Tilesets {
+			tilesets[tileset.TilesetID] = tileset
+			if tileset.Name == "" {
+				continue
+			}
+			if err := a.writeTilesetPNG(fmt.Sprintf("img/%s_%s.png", filename, tileset.Name), tileset); err != nil {
 				return nil, err
 			}
-			centerX := cel.X + int16(cel.WidthInPix)/2
-			centerY := cel.Y + int16(cel.HeightInPix)/2
-			objects = append(objects, element{
-				Group: filename,
-				Name:  layer,
-				X:     centerX,
-				// y coordinates are reversed in defold
-				Y: int16(file.Header.HeightInPixels) - centerY,
-				W: int(cel.WidthInPix),
-				H: int(cel.HeightInPix),
-			})
+		}
+		for _, cel := range frame.Cels {
+			const (
+				Image   = 2
+				Tilemap = 3
+			)
+			switch cel.CelType {
+			case Image:
+				layer := frame.Layers[cel.LayerIndex].LayerName
+				if err := a.writePNG(fmt.Sprintf("img/%s_%s.png", filename, layer), cel); err != nil {
+					return nil, err
+				}
+				centerX := cel.X + int16(cel.WidthInPix)/2
+				centerY := cel.Y + int16(cel.HeightInPix)/2
+				objects = append(objects, element{
+					Group: filename,
+					Name:  layer,
+					X:     centerX,
+					// y coordinates are reversed in defold
+					Y: int16(file.Header.HeightInPixels) - centerY,
+					W: int(cel.WidthInPix),
+					H: int(cel.HeightInPix),
+				})
+			case Tilemap:
+				layer := frame.Layers[cel.LayerIndex].LayerName
+				tileset, ok := tilesets[frame.Layers[cel.LayerIndex].TilesetIndex]
+				if !ok {
+					continue
+				}
+				var objectName string
+				if strings.HasSuffix(layer, ".object") {
+					objectName = strings.TrimSuffix(layer, ".object")
+				}
+				r := bytes.NewReader(cel.Tiles)
+				for y := 0; y < int(cel.HeightInTiles); y++ {
+					for x := 0; x < int(cel.WidthInTiles); x++ {
+						var tileIndex uint32
+						if err := binary.Read(r, binary.LittleEndian, &tileIndex); err != nil {
+							return nil, fmt.Errorf("failed to read tile data: %s", err)
+						}
+						if tileIndex > 0 {
+							if objectName != "" {
+								objects = append(objects, element{
+									X: cel.X + int16(x)*int16(tileset.TileWidth) + int16(tileset.TileWidth)/2,
+									// y coordinates are reversed in defold
+									Y:     int16(file.Header.HeightInPixels) - cel.Y - int16(y)*int16(tileset.TileHeight),
+									Name:  objectName,
+									Index: len(objects) + 1,
+								})
+							} else {
+								tiles = append(tiles, element{
+									X:     int16(x),
+									Y:     int16(cel.HeightInTiles) - int16(y),
+									Index: int(tileIndex),
+								})
+							}
+						}
+					}
+				}
+			default:
+				log.Printf("unsupported cel type %d", cel.CelType)
+			}
 		}
 		for _, slice := range frame.Slices {
 			for _, data := range slice.SliceKeysData {
@@ -175,6 +234,11 @@ func (a asepriteImporter) importLevel(filename string, dataOffset int, file asef
 	level.Triggers = triggers
 	if err := a.render(filename+".atlas", atlasTemplate, level.Objects); err != nil {
 		return nil, err
+	}
+	if len(tiles) > 0 {
+		if err := a.render(filename+".tilemap", tilemapTemplate, tiles); err != nil {
+			return nil, err
+		}
 	}
 	return datas, a.render(filename+".collection", collectionTemplate, level)
 }
@@ -226,6 +290,31 @@ func (a asepriteImporter) importUI(filename string, file asefile.AsepriteFile) e
 		return err
 	}
 	return a.render(filename+".gui", guiTemplate, gui)
+}
+
+func (a asepriteImporter) writeTilesetPNG(filename string, tileset asefile.AsepriteTilesetChunk2023) error {
+	out, err := zlib.NewReader(bytes.NewReader(tileset.CompressedTilesetImg))
+	if err != nil {
+		return err
+	}
+	data, err := io.ReadAll(out)
+	if err != nil {
+		return err
+	}
+	w, h := int(tileset.TileWidth), int(tileset.NumTiles)*int(tileset.TileHeight)
+	img := image.NewRGBA(image.Rect(0, 0, w, h))
+	offset := 0
+	for y := 0; y < h; y++ {
+		for x := 0; x < w; x, offset = x+1, offset+4 {
+			col := color.RGBA{data[offset], data[offset+1], data[offset+2], data[offset+3]}
+			img.SetRGBA(x, y, col)
+		}
+	}
+	buf := new(bytes.Buffer)
+	if err := png.Encode(buf, img); err != nil {
+		return err
+	}
+	return a.writeFile(filename, buf)
 }
 
 // TODO: this function seems like it would support multiple cels and flatten the layers,
