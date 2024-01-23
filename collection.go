@@ -5,36 +5,6 @@ import "text/template"
 var collectionTemplate = template.Must(template.New("").Parse(`
 name: "{{ .Filename }}"
 scale_along_z: 0
-embedded_instances {
-  id: "world"
-{{- range .Objects }}
-{{- if .Group }}
-  children: "{{ .Name }}"
-{{- else }}
-  children: "{{ .Name }}{{ .Index }}"
-{{- end }}
-{{- end }}
-{{- range .Triggers }}
-  children: "{{ .Name }}"
-{{- end }}
-  data: ""
-  position {
-    x: 0.0
-    y: 0.0
-    z: 0.0
-  }
-  rotation {
-    x: 0.0
-    y: 0.0
-    z: 0.0
-    w: 1.0
-  }
-  scale3 {
-    x: 1.0
-    y: 1.0
-    z: 1.0
-  }
-}
 {{- range .Objects }}
 {{- if .Group }}
 embedded_instances {

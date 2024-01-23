@@ -40,6 +40,7 @@ type asepriteImporter struct {
 func (a asepriteImporter) Import(filenames []string) error {
 	var (
 		animations []animation
+		uiNodes    []element
 		datas      []string
 	)
 	for _, file := range filenames {
@@ -54,9 +55,11 @@ func (a asepriteImporter) Import(filenames []string) error {
 		dir, name := filepath.Split(file)
 		name = strings.TrimSuffix(name, filepath.Ext(name))
 		if strings.HasSuffix(dir, "ui/") {
-			if err := a.importUI(name, aseFile); err != nil {
+			ui, err := a.importUI(name, aseFile)
+			if err != nil {
 				return err
 			}
+			uiNodes = append(uiNodes, ui...)
 		} else if strings.HasSuffix(dir, "sprites/") {
 			anim, err := a.importSprite(name, aseFile)
 			if err != nil {
@@ -81,6 +84,10 @@ func (a asepriteImporter) Import(filenames []string) error {
 	}
 	// Combine all game animations into single atlas for performance
 	if err := a.render("all.atlas", animationsTemplate, animations); err != nil {
+		return err
+	}
+	// Also all UI nodes
+	if err := a.render("ui.atlas", atlasTemplate, uiNodes); err != nil {
 		return err
 	}
 	return nil
@@ -243,7 +250,7 @@ func (a asepriteImporter) importLevel(filename string, dataOffset int, file asef
 	return datas, a.render(filename+".collection", collectionTemplate, level)
 }
 
-func (a asepriteImporter) importUI(filename string, file asefile.AsepriteFile) error {
+func (a asepriteImporter) importUI(filename string, file asefile.AsepriteFile) ([]element, error) {
 	var gui struct {
 		Textures []string
 		Elements []element
@@ -254,7 +261,7 @@ func (a asepriteImporter) importUI(filename string, file asefile.AsepriteFile) e
 		for _, cel := range frame.Cels {
 			layer := frame.Layers[cel.LayerIndex].LayerName
 			if err := a.writePNG(fmt.Sprintf("img/%s_%s.png", filename, layer), cel); err != nil {
-				return err
+				return nil, err
 			}
 			gui.Elements = append(gui.Elements, element{
 				Group: filename,
@@ -286,10 +293,10 @@ func (a asepriteImporter) importUI(filename string, file asefile.AsepriteFile) e
 	if needsAllTextures {
 		gui.Textures = append(gui.Textures, "all")
 	}
-	if err := a.render(filename+".atlas", atlasTemplate, gui.Elements); err != nil {
-		return err
+	if err := a.render(filename+".gui", guiTemplate, gui); err != nil {
+		return nil, err
 	}
-	return a.render(filename+".gui", guiTemplate, gui)
+	return gui.Elements, nil
 }
 
 func (a asepriteImporter) writeTilesetPNG(filename string, tileset asefile.AsepriteTilesetChunk2023) error {
