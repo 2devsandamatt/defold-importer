@@ -189,18 +189,21 @@ func (a asepriteImporter) importLevel(filename string, dataOffset int, file asef
 							return nil, fmt.Errorf("failed to read tile data: %s", err)
 						}
 						if tileIndex > 0 {
+							x := cel.X + int16(x)*int16(tileset.TileWidth) + int16(tileset.TileWidth)/2
+							y := int16(file.Header.HeightInPixels) - cel.Y - int16(y)*int16(tileset.TileHeight)
 							if objectName != "" {
 								objects = append(objects, element{
-									X: cel.X + int16(x)*int16(tileset.TileWidth) + int16(tileset.TileWidth)/2,
+									X: x,
 									// y coordinates are reversed in defold
-									Y:     int16(file.Header.HeightInPixels) - cel.Y - int16(y)*int16(tileset.TileHeight),
+									Y:     y,
 									Name:  objectName,
 									Index: len(objects) + 1,
 								})
 							} else {
 								tiles = append(tiles, element{
-									X:     int16(x),
-									Y:     int16(cel.HeightInTiles) - int16(y),
+									X: x / int16(tileset.TileWidth),
+									// y coordinates are reversed in defold
+									Y:     y/int16(tileset.TileHeight) - 1,
 									Index: int(tileIndex),
 								})
 							}
@@ -235,15 +238,17 @@ func (a asepriteImporter) importLevel(filename string, dataOffset int, file asef
 		Filename string
 		Objects  []element
 		Triggers []element
+		Tiles    []element
 	}
 	level.Filename = filename
 	level.Objects = objects
 	level.Triggers = triggers
+	level.Tiles = tiles
 	if err := a.render(filename+".atlas", atlasTemplate, level.Objects); err != nil {
 		return nil, err
 	}
 	if len(tiles) > 0 {
-		if err := a.render(filename+".tilemap", tilemapTemplate, tiles); err != nil {
+		if err := a.render(filename+".tilemap", tilemapTemplate, level); err != nil {
 			return nil, err
 		}
 	}

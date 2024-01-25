@@ -3,12 +3,12 @@ package main
 import "text/template"
 
 var tilemapTemplate = template.Must(template.New("").Parse(`
-tile_set: "/game/levels.tilesource"
+tile_set: "/game/{{ .Filename }}.tilesource"
 layers {
   id: "background"
   z: 0.0
   is_visible: 1
-  {{- range . }}
+  {{- range .Tiles }}
   cell {
     x: {{ .X }}
     y: {{ .Y }}
