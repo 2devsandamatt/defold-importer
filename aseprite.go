@@ -157,19 +157,32 @@ func (a asepriteImporter) importLevel(filename string, dataOffset int, file asef
 			switch cel.CelType {
 			case Image:
 				layer := frame.Layers[cel.LayerIndex].LayerName
-				if err := a.writePNG(fmt.Sprintf("img/%s_%s.png", filename, layer), cel); err != nil {
-					return nil, err
+				var objectName string
+				if strings.HasSuffix(layer, ".object") {
+					objectName = strings.TrimSuffix(layer, ".object")
 				}
 				centerX := cel.X + int16(cel.WidthInPix)/2
 				centerY := cel.Y + int16(cel.HeightInPix)/2
+				// y coordinates are reversed in defold
+				y := int16(file.Header.HeightInPixels) - centerY
+				if objectName != "" {
+					objects = append(objects, element{
+						X:    centerX,
+						Y:    y,
+						Name: objectName,
+					})
+					continue
+				}
+				if err := a.writePNG(fmt.Sprintf("img/%s_%s.png", filename, layer), cel); err != nil {
+					return nil, err
+				}
 				objects = append(objects, element{
 					Group: filename,
 					Name:  layer,
 					X:     centerX,
-					// y coordinates are reversed in defold
-					Y: int16(file.Header.HeightInPixels) - centerY,
-					W: int(cel.WidthInPix),
-					H: int(cel.HeightInPix),
+					Y:     y,
+					W:     int(cel.WidthInPix),
+					H:     int(cel.HeightInPix),
 				})
 			case Tilemap:
 				layer := frame.Layers[cel.LayerIndex].LayerName
@@ -190,19 +203,18 @@ func (a asepriteImporter) importLevel(filename string, dataOffset int, file asef
 						}
 						if tileIndex > 0 {
 							x := cel.X + int16(x)*int16(tileset.TileWidth) + int16(tileset.TileWidth)/2
+							// y coordinates are reversed in defold
 							y := int16(file.Header.HeightInPixels) - cel.Y - int16(y)*int16(tileset.TileHeight)
 							if objectName != "" {
 								objects = append(objects, element{
-									X: x,
-									// y coordinates are reversed in defold
+									X:     x,
 									Y:     y,
 									Name:  objectName,
 									Index: len(objects) + 1,
 								})
 							} else {
 								tiles = append(tiles, element{
-									X: x / int16(tileset.TileWidth),
-									// y coordinates are reversed in defold
+									X:     x / int16(tileset.TileWidth),
 									Y:     y/int16(tileset.TileHeight) - 1,
 									Index: int(tileIndex),
 								})

@@ -49,7 +49,7 @@ embedded_instances {
 }
 {{- else }}
 instances {
-  id: "{{ .Name }}{{ .Index }}"
+  id: "{{ .Name }}{{ or .Index "" }}"
   prototype: "/game/objects/{{ .Name }}.go"
   position {
     x: {{ .X }}.0
