@@ -145,7 +145,7 @@ func (a asepriteImporter) importLevel(filename string, dataOffset int, file asef
 			if tileset.Name == "" {
 				continue
 			}
-			if err := a.writeTilesetPNG(fmt.Sprintf("img/%s_%s.png", filename, tileset.Name), tileset); err != nil {
+			if err := a.writeTilesetPNG(fmt.Sprintf("img/%s_tiles_%s.png", filename, tileset.Name), tileset); err != nil {
 				return nil, err
 			}
 		}
