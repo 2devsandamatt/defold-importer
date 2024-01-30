@@ -1,4 +1,4 @@
-module defoldgameframework
+module defold-importer
 
 go 1.21.5
 
